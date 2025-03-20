@@ -1,0 +1,29 @@
+# node_modules 폴더 제외
+node_modules
+
+# 빌드 결과물 제외
+dist
+build
+out
+
+# 환경설정 및 잠금 파일 제외
+.yarn
+.pnp.*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 환경 변수 파일 제외
+.env
+.env.*.local
+
+# Vite 캐시 폴더 제외
+.vite
+
+# ESLint 캐시 파일
+.eslintcache
+
+# 포맷팅에서 제외할 특정 파일
+public/*.js
+public/*.css
+coverage

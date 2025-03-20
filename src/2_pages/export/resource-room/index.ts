@@ -1,0 +1,1 @@
+export { ResourceRoomPage } from "./ui";

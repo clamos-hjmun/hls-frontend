@@ -1,0 +1,1 @@
+export { VideoSettingsPage } from "./ui";

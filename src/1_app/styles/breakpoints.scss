@@ -1,0 +1,16 @@
+@use "sass:map";
+
+$breakpoints: (
+  tablet: 1280px,
+);
+
+@mixin respond($breakpoint) {
+  @if map.has-key($breakpoints, $breakpoint) {
+    $size: map.get($breakpoints, $breakpoint);
+    @media (max-width: $size) {
+      @content;
+    }
+  } @else {
+    @error "Breakpoint #{$breakpoint} is not defined!";
+  }
+}
