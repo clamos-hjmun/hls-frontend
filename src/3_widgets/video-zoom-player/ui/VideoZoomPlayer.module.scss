@@ -1,0 +1,260 @@
+/* Hls Video */
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.top {
+    position: relative;
+    width: 1200px;
+}
+
+.video {
+    transform-origin: top left;
+    width: 100%;
+}
+
+.canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 40px);
+    cursor: grab;
+}
+
+.bottom {
+    display: flex;
+    justify-content: space-between;
+}
+
+.button_group {
+    display: flex;
+    flex-direction: column;
+    width: 170px;
+    height: 370px;
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    background: rgba(36, 36, 36, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.button_group button {
+    padding: 10px 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: fit-content;
+}
+
+.button_group button:hover {
+    background-color: rgb(165, 164, 164);
+    color: #444;
+}
+
+.capture_button:hover {
+    background-color: rgb(165, 164, 164);
+    color: #444;
+}
+
+/* Zoom Level */
+.zoom_level {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Mini Map */
+.minimap {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.minimap_viewport {
+    position: absolute;
+    border: 2px solid red;
+    cursor: grab;
+}
+
+/* Zoom Controller */
+.zoom_controller button {
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    color: white;
+    border: none;
+    justify-self: stretch;
+    padding: 2px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    svg {
+        display: block;
+        margin: 0 auto;
+    }
+}
+
+.zoom_controller button:hover {
+    background-color: rgb(165, 164, 164);
+    color: #444;
+}
+
+.zoom_buttons {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.zoom_buttons button {
+    width: 50px;
+    height: 50px;
+}
+
+.move_buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    padding: 10px;
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+    position: relative;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.move_up {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.move_down {
+    grid-column: 2;
+    grid-row: 3;
+}
+
+.move_left {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.move_right {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.zoom_in {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.zoom_out {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.move_reset {
+    grid-row: 2;
+}
+
+/* FPS Controller */
+.frame_button_group {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.frame_button_wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.frame_label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+}
+
+/* Description */
+.description {
+    background: #1e1e2e;
+    color: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+}
+
+.title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.list {
+    list-style: none;
+    padding: 0;
+}
+
+.list li {
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    margin: 8px 0;
+    padding: 6px;
+    transition: transform 0.2s ease-in-out;
+}
+
+.list li:hover {
+    transform: scale(1.05);
+    color: #ffcc00;
+    cursor: pointer;
+}
+
+.icon {
+    margin-right: 10px;
+    color: #ffcc00;
+    font-size: 18px;
+}
+
+.warning {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 5px;
+}
+
+.warningTitle {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #856404;
+}
+
+.warningText {
+    font-size: 1rem;
+    color: #6c757d;
+    margin: 10px 0;
+}

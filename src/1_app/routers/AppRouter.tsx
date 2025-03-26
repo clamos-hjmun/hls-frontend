@@ -19,59 +19,59 @@ import { NotificationsPage } from "@/2_pages/settings/notifications";
 import { NotFoundPage } from "@/2_pages/404";
 
 export const AppRouter = createBrowserRouter([
-  {
-    element: <BaseLayout />,
-    errorElement: <NotFoundPage />,
-    children: [
-      { path: "/", element: <HomePage /> },
-      { path: "/login", element: <LoginPage /> },
-
-      // 반출 관리
-      {
-        path: "/export",
+    {
+        element: <BaseLayout />,
+        errorElement: <NotFoundPage />,
         children: [
-          { path: "video-view", element: <VideoViewPage /> },
-          { path: "request", element: <ExportRequestPage /> },
-          { path: "status", element: <ExportStatusPage /> },
-          { path: "resource-room", element: <ResourceRoomPage /> },
+            { path: "/", element: <HomePage /> },
+            { path: "/login", element: <LoginPage /> },
+
+            // 반출 관리
+            {
+                path: "/export",
+                children: [
+                    { path: "video-view", element: <VideoViewPage /> },
+                    { path: "request", element: <ExportRequestPage /> },
+                    { path: "status", element: <ExportStatusPage /> },
+                    { path: "resource-room", element: <ResourceRoomPage /> },
+                ],
+            },
+
+            // 장비 관리
+            { path: "/equipment/status", element: <EquipmentStatusPage /> },
+
+            // 조직 관리
+            {
+                path: "/org",
+                children: [
+                    { path: "permissions", element: <PermissionSettingsPage /> },
+                    { path: "sync", element: <OrganizationSyncPage /> },
+                ],
+            },
+
+            // 로그 관리
+            {
+                path: "/logs",
+                children: [
+                    { path: "equipment", element: <EquipmentLogsPage /> },
+                    { path: "export", element: <ExportLogsPage /> },
+                    { path: "access-query", element: <AccessQueryLogsPage /> },
+                    { path: "sync", element: <SyncLogsPage /> },
+                ],
+            },
+
+            // 환경 설정
+            {
+                path: "/settings",
+                children: [
+                    { path: "video", element: <VideoSettingsPage /> },
+                    { path: "user", element: <UserInfoPage /> },
+                    { path: "notifications", element: <NotificationsPage /> },
+                ],
+            },
+
+            // 404 페이지 처리
+            { path: "*", element: <NotFoundPage /> },
         ],
-      },
-
-      // 장비 관리
-      { path: "/equipment/status", element: <EquipmentStatusPage /> },
-
-      // 조직 관리
-      {
-        path: "/org",
-        children: [
-          { path: "permissions", element: <PermissionSettingsPage /> },
-          { path: "sync", element: <OrganizationSyncPage /> },
-        ],
-      },
-
-      // 로그 관리
-      {
-        path: "/logs",
-        children: [
-          { path: "equipment", element: <EquipmentLogsPage /> },
-          { path: "export", element: <ExportLogsPage /> },
-          { path: "access-query", element: <AccessQueryLogsPage /> },
-          { path: "sync", element: <SyncLogsPage /> },
-        ],
-      },
-
-      // 환경 설정
-      {
-        path: "/settings",
-        children: [
-          { path: "video", element: <VideoSettingsPage /> },
-          { path: "user", element: <UserInfoPage /> },
-          { path: "notifications", element: <NotificationsPage /> },
-        ],
-      },
-
-      // 404 페이지 처리
-      { path: "*", element: <NotFoundPage /> },
-    ],
-  },
+    },
 ]);

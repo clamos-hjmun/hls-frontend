@@ -5,12 +5,12 @@ import { useFsdDebug } from "@/6_shared/lib";
 import { Loader } from "@/6_shared/ui";
 
 export const MainProviders: React.FC = () => {
-  useFsdDebug();
+    useFsdDebug();
 
-  return (
-    <QueryProvider>
-      <RouterProvider />
-      <Loader />
-    </QueryProvider>
-  );
+    return (
+        <QueryProvider>
+            <RouterProvider />
+            <Loader />
+        </QueryProvider>
+    );
 };
