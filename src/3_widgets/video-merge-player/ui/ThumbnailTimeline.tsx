@@ -22,9 +22,12 @@ export const ThumbnailTimeline = ({
 }: ThumbnailTimelineProps) => {
     const [timelineImages, setTimelineImagesState] = useState<{ url: string; time: number }[]>([]);
     const [dragging, setDragging] = useState<boolean>(false);
+    const [dragType, setDragType] = useState<"create" | "handle" | "move" | null>(null);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dragStartX, setDragStartX] = useState<number>(0);
     const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
     const [draggingHandle, setDraggingHandle] = useState<"start" | "end" | null>(null);
+    const [dragOffset, setDragOffset] = useState(0);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
@@ -140,8 +143,10 @@ export const ThumbnailTimeline = ({
 
     /** 선택 범위 드래그 시작 */
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
+        if (!isMatchingDragType("create")) return;
         e.preventDefault();
         setDragging(true);
+        setDragType("create");
         const canvas = e.target as HTMLCanvasElement;
         const canvasRect = canvas.getBoundingClientRect();
         const startX = e.clientX - canvasRect.left;
@@ -151,7 +156,7 @@ export const ThumbnailTimeline = ({
 
     /** 선택 범위 드래그 진행 */
     const handleCanvasMouseMove = (e: React.MouseEvent) => {
-        if (!dragging || draggingHandle) return;
+        if (!dragging || draggingHandle || !isMatchingDragType("create")) return;
 
         const canvas = e.target as HTMLCanvasElement;
         const canvasRect = canvas.getBoundingClientRect();
@@ -163,12 +168,15 @@ export const ThumbnailTimeline = ({
         const startTime = (start / canvasRect.width) * duration;
         const endTime = (end / canvasRect.width) * duration;
 
+        if (isOverlapping({ start: startTime, end: endTime })) return;
+
         setSelectionRange({ start: startTime, end: endTime });
     };
 
     /** 선택 범위 드래그 종료 */
     const handleCanvasMouseUp = () => {
         setDragging(false);
+        setDragType(null);
 
         if (selectionRange) {
             setRanges((prevRanges) => [
@@ -186,51 +194,115 @@ export const ThumbnailTimeline = ({
 
     /** 선택 범위 핸들 드래그 시작 */
     const handleMouseDownHandle = (rangeId: string, handleType: "start" | "end", event: React.MouseEvent) => {
+        if (!isMatchingDragType("handle")) return;
         event.preventDefault();
         setDragging(true);
+        setDragType("handle");
         setDraggingHandle(handleType);
-        setSelectedRangeId(rangeId);
+        setDraggingId(rangeId);
     };
 
     /** 선택 범위 핸들 드래그 진행 */
     const handleMouseMove = (e: MouseEvent) => {
-        if (!draggingHandle || !selectedRangeId || !canvasRef.current) return;
+        if (!draggingHandle || !draggingId || !canvasRef.current || !isMatchingDragType("handle")) {
+            return;
+        }
 
         e.preventDefault();
 
         const canvasRect = canvasRef.current.getBoundingClientRect();
         const mouseX = e.clientX - canvasRect.left;
-        const time = (mouseX / canvasRect.width) * duration;
+        const newTime = (mouseX / canvasRect.width) * duration;
 
-        if (isOverlapping({ start: time, end: time }, selectedRangeId)) return;
+        const targetRange = ranges.find((range) => range.id === draggingId);
+        if (!targetRange) return;
 
-        // 선택된 범위 찾아서 드래그 시작/끝 위치를 수정
-        setRanges((prevRanges) =>
-            prevRanges.map((range) => {
-                if (range.id === selectedRangeId) {
-                    if (draggingHandle === "start" && time < range.end) {
-                        return { ...range, start: Math.max(time, 0) };
-                    } else if (draggingHandle === "end" && time > range.start) {
-                        return { ...range, end: Math.min(time, duration) };
-                    }
-                }
-                return range;
-            })
-        );
+        const updatedRange = getUpdatedRange(targetRange, draggingHandle, newTime, duration);
+        if (!updatedRange || isOverlapping(updatedRange, draggingId)) return;
 
+        setRanges((prevRanges) => prevRanges.map((range) => (range.id === draggingId ? updatedRange : range)));
+
+        setDraggingId(null);
         setSelectedRangeId(null);
+    };
+
+    /** 드래그된 핸들에 따라 범위를 업데이트하는 함수 */
+    const getUpdatedRange = (
+        range: { id: string; start: number; end: number },
+        handle: "start" | "end",
+        time: number,
+        maxDuration: number
+    ) => {
+        if (handle === "start" && time < range.end) {
+            return { ...range, start: Math.max(time, 0) };
+        }
+        if (handle === "end" && time > range.start) {
+            return { ...range, end: Math.min(time, maxDuration) };
+        }
+        return null;
     };
 
     /** 선택 범위 핸들 드래그 종료 */
     const handleMouseUp = () => {
         setDragging(false);
+        setDragType(null);
         setDraggingHandle(null);
     };
 
-    /** 범위가 겹치는지 확인 */
+    /** 범위 드래그 시작 */
+    const handleMouseRangeDown = (e: React.MouseEvent, rangeId: string) => {
+        if (!canvasRef.current || !isMatchingDragType("move")) return;
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - canvasRect.left;
+        const range = ranges.find((range) => range.id === rangeId);
+
+        if (!range) return;
+        setDragOffset(mouseX - (range.start / duration) * canvasRect.width);
+        setDragging(true);
+        setDragType("move");
+    };
+
+    /** 범위 드래그 진행 */
+    const handleMouseRangeMove = (e: React.MouseEvent, rangeId: string) => {
+        if (!canvasRef.current || !dragging || draggingHandle || !isMatchingDragType("move")) return;
+
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const range = ranges.find((range) => range.id === rangeId);
+
+        if (!range) return;
+
+        const mouseX = e.clientX - canvasRect.left;
+        const time = ((mouseX - dragOffset) / canvasRect.width) * duration;
+        const rangeWidth = range.end - range.start;
+
+        const newStart = Math.max(0, Math.min(time, duration - rangeWidth));
+        const newEnd = newStart + rangeWidth;
+
+        if (isOverlapping({ start: newStart, end: newEnd }, rangeId)) return;
+
+        setRanges((prevRanges) =>
+            prevRanges.map((prevRange) =>
+                prevRange.id === rangeId ? { ...prevRange, start: newStart, end: newEnd } : prevRange
+            )
+        );
+        setSelectedRangeId(null);
+    };
+
+    /** 범위 드래그 종료 */
+    const handelMouseRangeUp = () => {
+        setDragging(false);
+        setDragType(null);
+    };
+
     const isOverlapping = ({ start, end }: { start: number; end: number }, rangeId?: string): boolean => {
         return ranges.some((range) => {
-            if (rangeId && range.id === rangeId) return false;
+            if (range.id === rangeId) return false;
+
+            // 범위가 정확히 붙어있는 경우 허용
+            if (Math.abs(range.end - start) < 0.1 || Math.abs(range.start - end) < 0.1) {
+                return false;
+            }
+
             return start < range.end && end > range.start;
         });
     };
@@ -257,6 +329,11 @@ export const ThumbnailTimeline = ({
         } else {
             return formattedSeconds;
         }
+    };
+
+    /** 드래그 타입이 일치하는지 확인 */
+    const isMatchingDragType = (type: string): boolean => {
+        return dragType === type || dragType === null;
     };
 
     return (
@@ -292,9 +369,10 @@ export const ThumbnailTimeline = ({
                 >
                     <span
                         className={style.range_time}
-                        style={{
-                            display: (range.end - range.start) / duration < 0.1 ? "none" : "flex",
-                        }}
+                        style={{ visibility: (range.end - range.start) / duration < 0.1 ? "hidden" : "visible" }}
+                        onMouseDown={(e) => handleMouseRangeDown(e, range.id)}
+                        onMouseMove={(e) => handleMouseRangeMove(e, range.id)}
+                        onMouseUp={() => handelMouseRangeUp()}
                     >
                         {(range.end - range.start) / duration < 0.15 ? (
                             <div>
