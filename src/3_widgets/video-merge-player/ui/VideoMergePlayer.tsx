@@ -32,7 +32,7 @@ export const VideoMergePlayer = () => {
 
             if (!selectionRange || !player) return;
 
-            /** 선택 범위 영역이 지나면 비디오 자동 중지 */
+            /** 선택 범위 범위이 지나면 비디오 자동 중지 */
             const onTimeUpdate = () => {
                 if (player.currentTime >= selectionRange.end) {
                     player.pause();
@@ -110,19 +110,19 @@ const Description = () => {
                 </li>
                 <li className={style.icon}>
                     <FaArrowsAltH />
-                    타임라인을 드래그하여 영역 지정
+                    타임라인을 드래그하여 범위 지정
                 </li>
                 <li className={style.icon}>
                     <FaVideo />
-                    영역을 더블 클릭하여 영역 선택 및 재생
+                    범위을 더블 클릭하여 범위 선택 및 재생
                 </li>
                 <li className={style.icon}>
                     <FaTrash />
-                    영역 선택 후 Clear 버튼 클릭 시 선택 영역 삭제
+                    범위 선택 후 Clear 버튼 클릭 시 선택 범위 삭제
                 </li>
                 <li className={style.icon}>
                     <TfiLayoutSidebar2 />
-                    Merge 버튼 클릭 시 영역을 병합하여 새로운 영상 생성
+                    Merge 버튼 클릭 시 범위을 병합하여 새로운 영상 생성
                 </li>
             </ul>
         </div>
