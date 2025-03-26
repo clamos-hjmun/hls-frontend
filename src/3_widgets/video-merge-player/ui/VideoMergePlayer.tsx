@@ -4,6 +4,12 @@ import { MdVideocamOff } from "react-icons/md";
 import { ThumbnailTimeline } from "./ThumbnailTimeline";
 import { FaMouse, FaTrash, FaArrowsAltH, FaVideo } from "react-icons/fa";
 import { TfiLayoutSidebar2 } from "react-icons/tfi";
+import Button from "@mui/material/Button";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import Plyr from "plyr";
 import Hls from "hls.js";
 import style from "./VideoMergePlayer.module.scss";
@@ -141,6 +147,7 @@ const Controls = ({
     setSelectedRangeId,
     mergedVideoRef,
 }: ControlsProps) => {
+    const [dialogOpen, setDialogOpen] = useState(false);
     const [m3u8FileObject, setM3u8FileObject] = useState<
         { accumulatedTime: number; duration: string; tsFile: string }[]
     >([]);
@@ -172,7 +179,7 @@ const Controls = ({
     /** 선택 범위 삭제 */
     const handleRangeRemove = () => {
         if (!selectedRangeId) {
-            alert("삭제할 범위를 선택해주세요.");
+            setDialogOpen(true);
             return;
         }
 
@@ -261,10 +268,41 @@ const Controls = ({
         }
     };
 
+    /** 다이얼로그 닫기 */
+    const handleClose = () => {
+        setDialogOpen(false);
+    };
+
+    /** 다이얼로그 확인 */
+    const handleConfirm = () => {
+        setRanges([]);
+        setSelectedRangeId(null);
+        setDialogOpen(false);
+    };
+
     return (
         <div className={style.controls}>
             <button onClick={handleRangeRemove}>Clear</button>
             <button onClick={handleMerge}>Merge</button>
+            <Dialog
+                open={dialogOpen}
+                onClose={handleClose}
+                aria-labelledby="alert-dialog-title"
+                aria-describedby="alert-dialog-description"
+            >
+                <DialogTitle id="alert-dialog-title">범위를 삭제하시겠습니까?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="alert-dialog-description">
+                        선택된 범위가 없습니다. 전체 범위를 삭제하시겠습니까?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleClose}>취소</Button>
+                    <Button onClick={handleConfirm} autoFocus>
+                        확인
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 };
