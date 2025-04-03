@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useHlsPlayer } from "../lib";
 import { MdVideocamOff } from "react-icons/md";
 import { ThumbnailTimeline } from "./ThumbnailTimeline";
-import { FaMouse, FaTrash, FaArrowsAltH, FaVideo } from "react-icons/fa";
+import { FaMouse, FaTrash, FaArrowsAltH, FaVideo, FaMapPin } from "react-icons/fa";
 import { TfiLayoutSidebar2 } from "react-icons/tfi";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -12,7 +12,7 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import Plyr from "plyr";
 import Hls from "hls.js";
-import style from "./VideoMergePlayer.module.scss";
+import styles from "./VideoMergePlayer.module.scss";
 import "plyr/dist/plyr.css";
 
 const SERVER_API_URL = import.meta.env.VITE_SERVER_API_URL;
@@ -53,12 +53,10 @@ export const VideoMergePlayer = () => {
     }, [selectedRangeId]);
 
     return (
-        <div className={style.wrapper}>
-            <div className={style.left_container}>
-                <div className={style.video}>
-                    {/* 원본 비디오 */}
-                    <video ref={videoRef} />
-                </div>
+        <div className={styles.wrapper}>
+            <div className={styles.left_container}>
+                {/* 원본 비디오 */}
+                <video ref={videoRef} className={styles.video} />
 
                 {/* 비디오 썸네일 */}
                 <ThumbnailTimeline
@@ -69,7 +67,7 @@ export const VideoMergePlayer = () => {
                     selectedRangeId={selectedRangeId}
                     setSelectedRangeId={setSelectedRangeId}
                 />
-                <div className={style.bottom}>
+                <div className={styles.bottom}>
                     {/* 사용 방법 설명 */}
                     <Description />
                     {/* 컨트롤 버튼 */}
@@ -83,12 +81,12 @@ export const VideoMergePlayer = () => {
                     />
                 </div>
             </div>
-            <div className={style.right_container}>
+            <div className={styles.right_container}>
                 {/* 병합된 비디오 */}
                 {isMerging ? (
                     <video ref={mergedVideoRef} />
                 ) : (
-                    <div className={style.no_video}>
+                    <div className={styles.no_video}>
                         <MdVideocamOff size={50} />
                         <p>병합된 영상이 없습니다.</p>
                     </div>
@@ -100,31 +98,45 @@ export const VideoMergePlayer = () => {
 
 // ===================== Description 컴포넌트 =====================
 const Description = () => {
+    const usageList = [
+        { icon: <FaMouse />, text: "타임라인을 더블 클릭하여 시점 이동" },
+        { icon: <FaMapPin />, text: "마커를 드래그해서 시점 이동" },
+        { icon: <FaArrowsAltH />, text: "타임라인을 드래그하여 범위 지정" },
+        { icon: <FaVideo />, text: "범위을 더블 클릭하여 범위 선택 및 재생" },
+        { icon: <FaTrash />, text: "범위 선택 후 Clear 버튼 클릭 시 선택 범위 삭제" },
+        { icon: <TfiLayoutSidebar2 />, text: "Merge 버튼 클릭 시 범위을 병합하여 새로운 영상 생성" },
+    ];
+
+    const warningList = [
+        <>
+            타임라인을 이용한 드래그의 경우 더블 클릭 이벤트와 구분하기 위해 클릭 후{" "}
+            <strong className={styles.highlight}>250ms</strong> 이후 시작점이 지정됩니다.
+        </>,
+    ];
+
     return (
-        <div className={style.description}>
-            <h2 className={style.title}>사용 방법</h2>
-            <ul className={style.list}>
-                <li className={style.icon}>
-                    <FaMouse />
-                    타임라인을 더블 클릭하여 시점 이동
-                </li>
-                <li className={style.icon}>
-                    <FaArrowsAltH />
-                    타임라인을 드래그하여 범위 지정
-                </li>
-                <li className={style.icon}>
-                    <FaVideo />
-                    범위을 더블 클릭하여 범위 선택 및 재생
-                </li>
-                <li className={style.icon}>
-                    <FaTrash />
-                    범위 선택 후 Clear 버튼 클릭 시 선택 범위 삭제
-                </li>
-                <li className={style.icon}>
-                    <TfiLayoutSidebar2 />
-                    Merge 버튼 클릭 시 범위을 병합하여 새로운 영상 생성
-                </li>
+        <div className={styles.description}>
+            <h2 className={styles.title}>사용 방법</h2>
+            <ul className={styles.list}>
+                {usageList.map((item, index) => (
+                    <li key={index}>
+                        {item.icon} {item.text}
+                    </li>
+                ))}
             </ul>
+
+            {/* 주의 사항 섹션 */}
+            <div className={styles.warning}>
+                <h3 className={styles.warningTitle}>주의 사항</h3>
+                <p className={styles.warningText}>
+                    {warningList.map((item, index) => (
+                        <Fragment key={index}>
+                            {item}
+                            <br />
+                        </Fragment>
+                    ))}
+                </p>
+            </div>
         </div>
     );
 };
@@ -214,6 +226,7 @@ const Controls = ({
         });
 
         newM3U8Content += "#EXT-X-ENDLIST";
+
         return newM3U8Content;
     };
 
@@ -281,7 +294,7 @@ const Controls = ({
     };
 
     return (
-        <div className={style.controls}>
+        <div className={styles.controls}>
             <button onClick={handleRangeRemove}>Clear</button>
             <button onClick={handleMerge}>Merge</button>
             <Dialog

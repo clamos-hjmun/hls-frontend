@@ -72,7 +72,7 @@ export const VideoZoomPlayer = () => {
     };
 
     return (
-        <div className={styles.wrapper} data-fsd="widget/ui/hls-video">
+        <div className={styles.wrapper}>
             <div ref={containerRef} className={styles.top}>
                 <video ref={videoRef} className={styles.video} style={{ transform: videoTransform }} />
                 {/* 비디오 드래그하여 화면 이동 */}
@@ -265,8 +265,12 @@ const Description = () => {
     ];
 
     const warningList = [
-        "미니맵은 화면이 확대된 경우에만 활성화됩니다.",
-        "화면이 확대된 경우 비디오 클릭으로 중지 및 재생이 불가능합니다.(space bar로 제어 가능)",
+        <>
+            미니맵은 화면이 확대된 경우에만 <strong className={styles.highlight}>활성화</strong>됩니다.
+            <br />
+            화면이 확대된 경우 비디오 클릭으로 중지 및 재생이 <strong className={styles.highlight}>불가능</strong>
+            합니다.
+        </>,
     ];
 
     return (

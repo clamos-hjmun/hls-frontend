@@ -14,13 +14,13 @@
 
 .video {
     position: relative;
-    width: 800px;
-    height: 350px;
+    width: 800px !important;
+    height: 340px !important;
 }
 
 .right_container {
-    width: 800px;
-    height: 340px;
+    width: 800px !important;
+    height: 340px !important;
     background-color: black;
     display: flex;
     justify-content: center;
@@ -84,6 +84,12 @@
     margin: 8px 0;
     padding: 6px;
     transition: transform 0.2s ease-in-out;
+
+    svg {
+        margin-right: 10px;
+        color: #ffcc00;
+        font-size: 18px;
+    }
 }
 
 .list li:hover {
@@ -92,12 +98,29 @@
     cursor: pointer;
 }
 
-.icon {
-    svg {
-        margin-right: 10px;
-        color: #ffcc00;
-        font-size: 18px;
-    }
+.warning {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 5px;
+}
+
+.warningTitle {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #856404;
+}
+
+.warningText {
+    font-size: 1rem;
+    color: #6c757d;
+    margin: 10px 0;
+}
+
+.highlight {
+    color: #ff6347;
+    font-weight: bold;
 }
 
 /* Controls */

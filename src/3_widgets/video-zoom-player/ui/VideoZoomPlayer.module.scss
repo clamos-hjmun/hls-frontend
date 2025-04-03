@@ -13,6 +13,7 @@
 .video {
     transform-origin: top left;
     width: 100%;
+    height: 510px !important;
 }
 
 .canvas {
@@ -27,6 +28,7 @@
 .bottom {
     display: flex;
     justify-content: space-between;
+    width: 1200px;
 }
 
 .button_group {
@@ -257,4 +259,9 @@
     font-size: 1rem;
     color: #6c757d;
     margin: 10px 0;
+}
+
+.highlight {
+    color: #ff6347;
+    font-weight: bold;
 }

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
-import style from "./ThumbnailTimeline.module.scss";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import Skeleton from "@mui/material/Skeleton";
+import styles from "./ThumbnailTimeline.module.scss";
 
 interface ThumbnailTimelineProps {
     duration: number;
@@ -23,24 +24,32 @@ export const ThumbnailTimeline = ({
     const [timelineImages, setTimelineImagesState] = useState<{ url: string; time: number }[]>([]);
     const [dragging, setDragging] = useState<boolean>(false);
     const [dragType, setDragType] = useState<"create" | "handle" | "move" | null>(null);
+    const [draggingMarker, setDraggingMarker] = useState<boolean>(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dragStartX, setDragStartX] = useState<number>(0);
     const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
     const [draggingHandle, setDraggingHandle] = useState<"start" | "end" | null>(null);
     const [dragOffset, setDragOffset] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const progressRef = useRef<HTMLDivElement | null>(null);
+    const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const currentTimeRef = useRef<number>(0);
+    const animationFrameIdRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (duration === 0) return;
-
-        const updateTimeLine = () => {
-            drawCurrentTimeLine();
-            requestAnimationFrame(updateTimeLine);
-        };
-
         generateTimeline();
         requestAnimationFrame(updateTimeLine);
     }, [duration]);
+
+    useEffect(() => {
+        if (animationFrameIdRef.current && draggingMarker) {
+            cancelAnimationFrame(animationFrameIdRef.current);
+        } else {
+            animationFrameIdRef.current = requestAnimationFrame(updateTimeLine);
+        }
+    }, [draggingMarker]);
 
     useEffect(() => {
         document.addEventListener("mouseup", handleCanvasMouseUp);
@@ -64,25 +73,18 @@ export const ThumbnailTimeline = ({
 
     /** 현재 시간 라인 그리기 */
     const drawCurrentTimeLine = () => {
-        if (!canvasRef.current || !player) return;
-
-        const canvas = canvasRef.current;
-        const context = canvas.getContext("2d");
-
-        if (!context) return;
+        if (!progressRef.current || !player) return;
 
         const currentTime = player.currentTime;
-        const canvasWidth = canvas.width;
-        const lineX = (currentTime / duration) * canvasWidth;
-
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.beginPath();
-        context.moveTo(lineX, 0);
-        context.lineTo(lineX, canvas.height);
-        context.strokeStyle = "red";
-        context.lineWidth = 0.5;
-        context.stroke();
+        setCurrentTime(currentTime);
+        currentTimeRef.current = currentTime;
     };
+
+    /** 애니메이션 프레임을 사용하여 현재 시간 라인 업데이트 */
+    const updateTimeLine = useCallback(() => {
+        drawCurrentTimeLine();
+        animationFrameIdRef.current = requestAnimationFrame(updateTimeLine);
+    }, [drawCurrentTimeLine]);
 
     /** 썸네일 생성 */
     const generateTimeline = async () => {
@@ -119,7 +121,7 @@ export const ThumbnailTimeline = ({
         const response = await fetch(`${SERVER_API_URL}/api/create/thumbnail`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ duration }),
+            body: JSON.stringify({ duration, numFrames: 10 }),
         });
 
         const data = await response.json();
@@ -128,6 +130,12 @@ export const ThumbnailTimeline = ({
 
     /** 캔버스 더블 클릭 시 해당 시간으로 이동 */
     const handleCanvasDoubleClick = (e: React.MouseEvent) => {
+        // 기존 클릭 타이머 제거 (onMouseDown 실행 방지)
+        if (clickTimeoutRef.current) {
+            clearTimeout(clickTimeoutRef.current);
+            clickTimeoutRef.current = null;
+        }
+
         const canvas = e.target as HTMLCanvasElement;
         if (!canvas || !canvas.getBoundingClientRect) return;
 
@@ -141,17 +149,28 @@ export const ThumbnailTimeline = ({
         }
     };
 
+    // --------------------- 선택 범위 드래그 관련 ---------------------
+
     /** 선택 범위 드래그 시작 */
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
-        if (!isMatchingDragType("create")) return;
-        e.preventDefault();
-        setDragging(true);
-        setDragType("create");
-        const canvas = e.target as HTMLCanvasElement;
-        const canvasRect = canvas.getBoundingClientRect();
-        const startX = e.clientX - canvasRect.left;
-        setDragStartX(startX);
-        setSelectionRange(null);
+        // 기존 타임아웃이 있다면 제거 (doubleClick 방지)
+        if (clickTimeoutRef.current) {
+            clearTimeout(clickTimeoutRef.current);
+            clickTimeoutRef.current = null;
+        }
+
+        // 일정 시간 후에 실행하도록 설정
+        clickTimeoutRef.current = setTimeout(() => {
+            if (!isMatchingDragType("create")) return;
+            e.preventDefault();
+            setDragging(true);
+            setDragType("create");
+            const canvas = e.target as HTMLCanvasElement;
+            const canvasRect = canvas.getBoundingClientRect();
+            const startX = e.clientX - canvasRect.left;
+            setDragStartX(startX);
+            setSelectionRange(null);
+        }, 250); // 250ms 내에 두 번째 클릭이 없으면 실행
     };
 
     /** 선택 범위 드래그 진행 */
@@ -191,6 +210,8 @@ export const ThumbnailTimeline = ({
             setSelectionRange(null);
         }
     };
+
+    // --------------------- 선택 범위 핸들 드래그 관련 ---------------------
 
     /** 선택 범위 핸들 드래그 시작 */
     const handleMouseDownHandle = (rangeId: string, handleType: "start" | "end", event: React.MouseEvent) => {
@@ -249,6 +270,8 @@ export const ThumbnailTimeline = ({
         setDraggingHandle(null);
     };
 
+    // --------------------- 범위 드래그 관련 ---------------------
+
     /** 범위 드래그 시작 */
     const handleMouseRangeDown = (e: React.MouseEvent, rangeId: string) => {
         if (!canvasRef.current || !isMatchingDragType("move")) return;
@@ -294,6 +317,47 @@ export const ThumbnailTimeline = ({
         setDragType(null);
     };
 
+    // --------------------- 마커 드래그 관련 ---------------------
+
+    /** 마커 드래그 시작 */
+    const handleProgressMouseDown = () => {
+        setDraggingMarker(true);
+
+        document.addEventListener("mousemove", handleProgressMouseMove);
+        document.addEventListener("mouseup", handleProgressMouseUp);
+    };
+
+    /** 마커 드래그 진행 */
+    const handleProgressMouseMove = (e: MouseEvent) => {
+        if (!canvasRef.current) return;
+
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        let mouseX = e.clientX - canvasRect.left;
+
+        // 마커가 canvas의 범위를 벗어나지 않도록 제한
+        if (mouseX < 0) mouseX = 0;
+        if (mouseX > canvasRect.width) mouseX = canvasRect.width;
+
+        const newTime = (mouseX / canvasRect.width) * duration;
+        currentTimeRef.current = newTime;
+        setCurrentTime(newTime);
+    };
+
+    /** 마커 드래그 종료 */
+    const handleProgressMouseUp = () => {
+        if (!player) return;
+
+        player.currentTime = currentTimeRef.current;
+        setCurrentTime(currentTimeRef.current);
+        setDraggingMarker(false);
+
+        document.removeEventListener("mousemove", handleProgressMouseMove);
+        document.removeEventListener("mouseup", handleProgressMouseUp);
+    };
+
+    // --------------------- 기타 공통 함수 ---------------------
+
+    /** 범위가 겹치는지 확인 */
     const isOverlapping = ({ start, end }: { start: number; end: number }, rangeId?: string): boolean => {
         return ranges.some((range) => {
             if (range.id === rangeId) return false;
@@ -336,19 +400,27 @@ export const ThumbnailTimeline = ({
         return dragType === type || dragType === null;
     };
 
+    if (!timelineImages.length) {
+        return (
+            <div className={styles.timeline_container}>
+                <Skeleton variant="rectangular" width={"100%"} height={90} animation="wave" />
+            </div>
+        );
+    }
+
     return (
-        <div className={style.timeline_container}>
+        <div className={styles.timeline_container}>
             {timelineImages.map((thumbnail, index) => {
                 return (
-                    <div key={index} className={style.timeline_thumbnail}>
+                    <div key={index} className={styles.timeline_thumbnail}>
                         <img src={thumbnail.url} alt={`Screenshot at ${thumbnail.time}s`} />
-                        <div className={style.timestamp}>{formatTime(thumbnail.time)}</div>
+                        <div className={styles.timestamp}>{formatTime(thumbnail.time)}</div>
                     </div>
                 );
             })}
             <canvas
                 ref={canvasRef}
-                className={style.timeline_canvas}
+                className={styles.timeline_canvas}
                 width={160}
                 height={90}
                 onDoubleClick={handleCanvasDoubleClick}
@@ -356,10 +428,18 @@ export const ThumbnailTimeline = ({
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
             />
+            <div
+                ref={progressRef}
+                className={styles.timeline_marker}
+                style={{ left: `${(currentTime / duration) * 100}%` }}
+                onMouseDown={handleProgressMouseDown}
+            >
+                {draggingMarker && <div className={styles.current_time}>{formatTime(currentTime)}</div>}
+            </div>
             {ranges.map((range) => (
                 <div
                     key={range.id}
-                    className={style.selection_range}
+                    className={styles.selection_range}
                     style={{
                         border: selectedRangeId === range.id ? "2px solid #0056b3" : "2px solid rgb(204, 204, 204)",
                         left: `${(range.start / duration) * 100}%`,
@@ -368,7 +448,7 @@ export const ThumbnailTimeline = ({
                     onDoubleClick={() => setSelectedRangeId(range.id)}
                 >
                     <span
-                        className={style.range_time}
+                        className={styles.range_time}
                         style={{ visibility: (range.end - range.start) / duration < 0.1 ? "hidden" : "visible" }}
                         onMouseDown={(e) => handleMouseRangeDown(e, range.id)}
                         onMouseMove={(e) => handleMouseRangeMove(e, range.id)}
@@ -385,12 +465,12 @@ export const ThumbnailTimeline = ({
                         )}
                     </span>
                     <div
-                        className={`${style.handle} ${style.start_handle}`}
+                        className={`${styles.handle} ${styles.start_handle}`}
                         style={{ left: 0 }}
                         onMouseDown={(e) => handleMouseDownHandle(range.id, "start", e)}
                     />
                     <div
-                        className={`${style.handle} ${style.end_handle}`}
+                        className={`${styles.handle} ${styles.end_handle}`}
                         style={{ right: 0 }}
                         onMouseDown={(e) => handleMouseDownHandle(range.id, "end", e)}
                     />
@@ -398,7 +478,7 @@ export const ThumbnailTimeline = ({
             ))}
             {selectionRange && (
                 <div
-                    className={style.selection_range}
+                    className={styles.selection_range}
                     style={{
                         left: `${(selectionRange.start / duration) * 100}%`,
                         width: `${((selectionRange.end - selectionRange.start) / duration) * 100}%`,
