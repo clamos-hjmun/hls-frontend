@@ -400,6 +400,7 @@ export const ThumbnailTimeline = ({
         return dragType === type || dragType === null;
     };
 
+    // 타임라인 이미지가 없을 경우 스켈레톤 로딩 표시
     if (!timelineImages.length) {
         return (
             <div className={styles.timeline_container}>
@@ -410,6 +411,7 @@ export const ThumbnailTimeline = ({
 
     return (
         <div className={styles.timeline_container}>
+            {/* 썸네일 이미지 렌더링 */}
             {timelineImages.map((thumbnail, index) => {
                 return (
                     <div key={index} className={styles.timeline_thumbnail}>
@@ -418,6 +420,7 @@ export const ThumbnailTimeline = ({
                     </div>
                 );
             })}
+            {/* 마우스 이벤트를 위한 캔버스 */}
             <canvas
                 ref={canvasRef}
                 className={styles.timeline_canvas}
@@ -428,6 +431,7 @@ export const ThumbnailTimeline = ({
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
             />
+            {/* 타임라인 마커 */}
             <div
                 ref={progressRef}
                 className={styles.timeline_marker}
@@ -436,6 +440,7 @@ export const ThumbnailTimeline = ({
             >
                 {draggingMarker && <div className={styles.current_time}>{formatTime(currentTime)}</div>}
             </div>
+            {/* 선택 범위 */}
             {ranges.map((range) => (
                 <div
                     key={range.id}
@@ -447,6 +452,7 @@ export const ThumbnailTimeline = ({
                     }}
                     onDoubleClick={() => setSelectedRangeId(range.id)}
                 >
+                    {/* 범위 시간 표시 */}
                     <span
                         className={styles.range_time}
                         style={{ visibility: (range.end - range.start) / duration < 0.1 ? "hidden" : "visible" }}
@@ -454,6 +460,7 @@ export const ThumbnailTimeline = ({
                         onMouseMove={(e) => handleMouseRangeMove(e, range.id)}
                         onMouseUp={() => handelMouseRangeUp()}
                     >
+                        {/* 범위 너비에 따라 시작 시간과 종료 시간 표시 형식 변경 */}
                         {(range.end - range.start) / duration < 0.15 ? (
                             <div>
                                 {formatTime(range.start)}
@@ -464,11 +471,13 @@ export const ThumbnailTimeline = ({
                             `${formatTime(range.start)} - ${formatTime(range.end)}`
                         )}
                     </span>
+                    {/* 왼쪽 드래그 핸들 */}
                     <div
                         className={`${styles.handle} ${styles.start_handle}`}
                         style={{ left: 0 }}
                         onMouseDown={(e) => handleMouseDownHandle(range.id, "start", e)}
                     />
+                    {/* 오른쪽 드래그 핸들 */}
                     <div
                         className={`${styles.handle} ${styles.end_handle}`}
                         style={{ right: 0 }}
@@ -476,6 +485,7 @@ export const ThumbnailTimeline = ({
                     />
                 </div>
             ))}
+            {/* 선택 범위 드래그 */}
             {selectionRange && (
                 <div
                     className={styles.selection_range}
