@@ -3,6 +3,7 @@ import { useHlsPlayer } from "../lib";
 import { MdVideocamOff } from "react-icons/md";
 import { ThumbnailTimeline } from "./ThumbnailTimeline";
 import { FaMouse, FaTrash, FaArrowsAltH, FaVideo, FaMapPin } from "react-icons/fa";
+import { RxSlider } from "react-icons/rx";
 import { TfiLayoutSidebar2 } from "react-icons/tfi";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -103,6 +104,7 @@ const Description = () => {
         { icon: <FaMapPin />, text: "마커를 드래그해서 시점 이동" },
         { icon: <FaArrowsAltH />, text: "타임라인을 드래그하여 범위 지정" },
         { icon: <FaVideo />, text: "범위을 더블 클릭하여 범위 선택 및 재생" },
+        { icon: <RxSlider />, text: "슬라이드를 이동하여 타임라인 간격 변경" },
         { icon: <FaTrash />, text: "범위 선택 후 Clear 버튼 클릭 시 선택 범위 삭제" },
         { icon: <TfiLayoutSidebar2 />, text: "Merge 버튼 클릭 시 범위을 병합하여 새로운 영상 생성" },
     ];
