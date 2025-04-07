@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, JSX } from "react";
+import { useState, useEffect, useRef, useCallback, JSX, Fragment } from "react";
 import { getFormatTime } from "../lib";
 import { Skeleton } from "@mui/material";
 import Slider from "@mui/material/Slider";
@@ -167,6 +167,7 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
                         progressRef={progressRef}
                         currentTimeRef={currentTimeRef}
                         currentTime={currentTime}
+                        loading={loading}
                         duration={duration}
                         setCurrentTime={setCurrentTime}
                         draggingMarker={draggingMarker}
@@ -517,52 +518,54 @@ const Timeline: React.FC<TimelineProps> = ({
 
             {/* 선택 범위 */}
             {!loading &&
-                ranges.map((range) => (
-                    <div
-                        key={range.id}
-                        className={styles.selection_range}
-                        style={{
-                            border: selectedRangeId === range.id ? "2px solid #0056b3" : "2px solid rgb(204, 204, 204)",
-                            left: `${(range.start / duration) * 100}%`,
-                            width: `${((range.end - range.start) / duration) * 100}%`,
-                        }}
-                        onDoubleClick={() => setSelectedRangeId(range.id)}
-                    >
-                        {/* 범위 시간 표시 */}
-                        <span
-                            className={styles.range_time}
+                ranges.map((range) => {
+                    const rangeWidth = (timelineWidth * (range.end - range.start)) / duration;
+
+                    return (
+                        <div
+                            key={range.id}
+                            className={styles.selection_range}
                             style={{
-                                visibility: range.end - range.start < 120 ? "hidden" : "visible",
+                                border: selectedRangeId === range.id ? "2px solid #0056b3" : "2px solid #cccccc",
+                                left: `${(range.start / duration) * 100}%`,
+                                width: `${((range.end - range.start) / duration) * 100}%`,
                             }}
-                            onMouseDown={(e) => handleMouseRangeDown(e, range.id)}
-                            onMouseMove={(e) => handleMouseRangeMove(e, range.id)}
-                            onMouseUp={() => handelMouseRangeUp()}
+                            onDoubleClick={() => setSelectedRangeId(range.id)}
                         >
-                            {/* 범위 너비에 따라 시작 시간과 종료 시간 표시 형식 변경 */}
-                            {range.end - range.start < 240 ? (
-                                <>
-                                    {getFormatTime(range.start)}
-                                    <br />
-                                    {getFormatTime(range.end)}
-                                </>
-                            ) : (
-                                `${getFormatTime(range.start)} - ${getFormatTime(range.end)}`
-                            )}
-                        </span>
-                        {/* 왼쪽 드래그 핸들 */}
-                        <div
-                            className={`${styles.handle} ${styles.start_handle}`}
-                            style={{ left: 0 }}
-                            onMouseDown={(e) => handleMouseDownHandle(range.id, "start", e)}
-                        />
-                        {/* 오른쪽 드래그 핸들 */}
-                        <div
-                            className={`${styles.handle} ${styles.end_handle}`}
-                            style={{ right: 0 }}
-                            onMouseDown={(e) => handleMouseDownHandle(range.id, "end", e)}
-                        />
-                    </div>
-                ))}
+                            {/* 범위 시간 표시 */}
+                            <span
+                                className={styles.range_time}
+                                style={{ visibility: rangeWidth < 57 ? "hidden" : "visible" }}
+                                onMouseDown={(e) => handleMouseRangeDown(e, range.id)}
+                                onMouseMove={(e) => handleMouseRangeMove(e, range.id)}
+                                onMouseUp={() => handelMouseRangeUp()}
+                            >
+                                {/* 범위 너비에 따라 시작 시간과 종료 시간 표시 형식 변경 */}
+                                {rangeWidth < 117 ? (
+                                    <Fragment>
+                                        {getFormatTime(range.start)}
+                                        <br />
+                                        {getFormatTime(range.end)}
+                                    </Fragment>
+                                ) : (
+                                    `${getFormatTime(range.start)} - ${getFormatTime(range.end)}`
+                                )}
+                            </span>
+                            {/* 왼쪽 드래그 핸들 */}
+                            <div
+                                className={`${styles.handle} ${styles.start_handle}`}
+                                style={{ left: 0 }}
+                                onMouseDown={(e) => handleMouseDownHandle(range.id, "start", e)}
+                            />
+                            {/* 오른쪽 드래그 핸들 */}
+                            <div
+                                className={`${styles.handle} ${styles.end_handle}`}
+                                style={{ right: 0 }}
+                                onMouseDown={(e) => handleMouseDownHandle(range.id, "end", e)}
+                            />
+                        </div>
+                    );
+                })}
 
             {/* 선택 범위 드래그 */}
             {selectionRange && (
@@ -610,6 +613,7 @@ interface TimelineMarkerProps {
     progressRef: React.RefObject<HTMLDivElement | null>;
     currentTimeRef: React.RefObject<number>;
     currentTime: number;
+    loading: boolean;
     duration: number;
     setCurrentTime: React.Dispatch<React.SetStateAction<number>>;
     draggingMarker: boolean;
@@ -622,6 +626,7 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
     progressRef,
     currentTimeRef,
     currentTime,
+    loading,
     duration,
     setCurrentTime,
     draggingMarker,
@@ -664,14 +669,18 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
     };
 
     return (
-        <div
-            ref={progressRef}
-            className={styles.timeline_marker}
-            style={{ left: `${(currentTime / duration) * 100}%` }}
-            onMouseDown={handleProgressMouseDown}
-        >
-            {draggingMarker && <div className={styles.current_time}>{getFormatTime(currentTime)}</div>}
-        </div>
+        <Fragment>
+            {!loading && (
+                <div
+                    ref={progressRef}
+                    className={styles.timeline_marker}
+                    style={{ left: `${(currentTime / duration) * 100}%` }}
+                    onMouseDown={handleProgressMouseDown}
+                >
+                    {draggingMarker && <div className={styles.current_time}>{getFormatTime(currentTime)}</div>}
+                </div>
+            )}
+        </Fragment>
     );
 };
 
