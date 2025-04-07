@@ -46,7 +46,7 @@ export const VideoMergePlayer = () => {
             <div className={styles.right_container}>
                 {/* 병합된 비디오 */}
                 {isMerging ? (
-                    <video ref={mergedVideoRef} />
+                    <video id="merge_video" ref={mergedVideoRef} />
                 ) : (
                     <div className={styles.no_video}>
                         <MdVideocamOff size={50} />

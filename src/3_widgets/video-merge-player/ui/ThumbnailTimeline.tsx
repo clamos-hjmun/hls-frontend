@@ -737,6 +737,7 @@ const Controls = ({
     selectedRangeId,
     setSelectedRangeId,
 }: ControlsProps) => {
+    const [playerInstance, setPlayerInstance] = useState<Plyr | null>(null);
     const [m3u8FileObject, setM3u8FileObject] = useState<
         { accumulatedTime: number; duration: string; tsFile: string }[]
     >([]);
@@ -835,22 +836,54 @@ const Controls = ({
     const initializePlayer = () => {
         if (!mergedVideoRef.current) return;
 
+        // 기존 플레이어 제거 처리
+        resetExistingPlayer();
+
+        // 썸네일용 쿼리 문자열 생성
+        const query = encodeURIComponent(JSON.stringify(ranges));
+
+        // Plyr 인스턴스 생성
         const player = new Plyr(mergedVideoRef.current, {
             autoplay: true,
             muted: true,
+            previewThumbnails: {
+                enabled: true,
+                src: `${SERVER_API_URL}/api/thumbnail/vtt-merge?ranges=${query}`,
+            },
             tooltips: { controls: true },
             keyboard: { global: true },
         });
 
-        if (!Hls.isSupported()) {
-            console.error("Hls.js를 지원하지 않는 브라우저입니다.");
-            return;
+        // 플레이어 준비 완료 시 HLS 로딩
+        player.on("ready", () => {
+            if (!mergedVideoRef.current) return;
+
+            if (!Hls.isSupported()) {
+                console.error("Hls.js를 지원하지 않는 브라우저입니다.");
+                return;
+            }
+
+            const hls = new Hls();
+            hls.loadSource(`${SERVER_API_URL}/api/updated_playlist.m3u8`);
+            hls.attachMedia(mergedVideoRef.current);
+            player.play();
+        });
+
+        setPlayerInstance(player);
+    };
+
+    /** 기존 플레이어 인스턴스를 제거하는 함수 */
+    const resetExistingPlayer = () => {
+        if (!playerInstance) return;
+
+        playerInstance.destroy();
+
+        const videoElement = document.getElementById("merge_video") as HTMLVideoElement;
+        if (videoElement) {
+            mergedVideoRef.current = videoElement;
         }
 
-        const hls = new Hls();
-        hls.loadSource(`${SERVER_API_URL}/api/updated_playlist.m3u8`);
-        hls.attachMedia(mergedVideoRef.current);
-        player.play();
+        setPlayerInstance(null);
     };
 
     /** 병합 실행 함수 */
