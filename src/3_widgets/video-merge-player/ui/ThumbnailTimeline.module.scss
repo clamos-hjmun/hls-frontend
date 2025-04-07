@@ -4,8 +4,15 @@
     flex-direction: column;
 }
 
-.timeline_wrapper {
+.top {
+    display: flex;
+    justify-content: flex-end;
+    margin: 20px 0;
+}
+
+.middle {
     max-width: 800px;
+    padding: 0 20px;
     overflow-y: hidden;
     user-select: none;
 
@@ -31,6 +38,13 @@
 .timeline_container {
     position: relative;
     height: 110px;
+}
+
+.bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
 }
 
 /* Timeline Ticks */
@@ -169,7 +183,7 @@
     background-color: #dc143c;
     transform: translateX(-50%);
     transition: background-color 0.2s ease-in-out;
-    z-index: 9999;
+    z-index: 3;
     cursor: grab;
 
     &::before {
@@ -205,14 +219,37 @@
     transform: translateX(-50%);
 }
 
-/* Timeline Slider */
-.timeline_slider_wrapper {
+/* Controls */
+.controls {
     display: flex;
-    justify-content: flex-end;
-    width: 100%;
-    margin-top: 20px;
+    justify-content: center;
+    align-items: flex-start;
+
+    .btn_main {
+        background-color: #ff6347;
+        color: #fff;
+
+        &:hover {
+            background-color: #e55347;
+        }
+    }
+
+    button {
+        background-color: #333;
+        color: #fff;
+        border: none;
+        padding: 10px;
+        margin: 0 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+
+        &:hover {
+            background-color: #555;
+        }
+    }
 }
 
+/* Timeline Slider */
 .timeline_slider {
     width: 300px;
 }

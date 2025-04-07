@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, JSX, Fragment } from "react";
+import { Skeleton, Select, MenuItem, InputLabel, FormControl } from "@mui/material";
 import { getFormatTime } from "../lib";
-import { Skeleton } from "@mui/material";
+import Plyr from "plyr";
+import Hls from "hls.js";
 import Slider from "@mui/material/Slider";
 import styles from "./ThumbnailTimeline.module.scss";
 
@@ -31,7 +33,10 @@ interface ThumbnailTimelineProps {
     player: Plyr | null;
     duration: number;
     ranges: { id: string; start: number; end: number }[];
+    videoRef: React.RefObject<HTMLVideoElement | null>;
     setRanges: React.Dispatch<React.SetStateAction<{ id: string; start: number; end: number }[]>>;
+    setIsMerging: React.Dispatch<React.SetStateAction<boolean>>;
+    mergedVideoRef: React.RefObject<HTMLVideoElement | null>;
     selectedRangeId: string | null;
     setSelectedRangeId: React.Dispatch<React.SetStateAction<string | null>>;
 }
@@ -40,7 +45,10 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
     player,
     duration,
     ranges,
+    videoRef,
     setRanges,
+    setIsMerging,
+    mergedVideoRef,
     selectedRangeId,
     setSelectedRangeId,
 }) => {
@@ -51,6 +59,7 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
     const [tickInterval, setTickInterval] = useState<number>(DEFAULT_TICK_INTERVAL);
     const [loading, setLoading] = useState<boolean>(true);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const scrollRef = useRef<HTMLDivElement | null>(null);
     const progressRef = useRef<HTMLDivElement | null>(null);
     const currentTimeRef = useRef<number>(0);
     const animationFrameIdRef = useRef<number | null>(null);
@@ -70,6 +79,23 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
         }
     }, [draggingMarker]);
 
+    useEffect(() => {
+        if (!selectedRangeId || !videoRef.current) return;
+
+        const selectionRange = ranges.find((range) => range.id === selectedRangeId);
+
+        if (!selectionRange || !player) return;
+
+        // 타임라인을 선택된 범위의 시작 위치로 스크롤 이동
+        scrollToSelectionStart(selectionRange);
+
+        // 선택된 범위의 시작 위치로 비디오 재생
+        if (selectionRange.start !== undefined) {
+            player.currentTime = selectionRange.start;
+            player.play();
+        }
+    }, [selectedRangeId]);
+
     /** 현재 시간 라인 그리기 */
     const drawCurrentTimeLine = () => {
         if (!progressRef.current || !player) return;
@@ -84,6 +110,22 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
         drawCurrentTimeLine();
         animationFrameIdRef.current = requestAnimationFrame(updateTimeLine);
     }, [drawCurrentTimeLine]);
+
+    /** 선택된 범위의 시작 위치로 canvas 스크롤을 이동시키는 함수 */
+    const scrollToSelectionStart = (selectionRange: { start: number; end: number }) => {
+        if (!canvasRef.current || !scrollRef.current) return;
+
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const left = (selectionRange.start / duration) * canvasRect.width;
+
+        // 선택된 시작 위치가 현재 스크롤 영역 바깥에 있을 경우 스크롤 이동
+        if (
+            left < scrollRef.current.scrollLeft ||
+            left > scrollRef.current.scrollLeft + scrollRef.current.clientWidth
+        ) {
+            scrollRef.current.scrollLeft = left;
+        }
+    };
 
     /** 썸네일 생성 */
     const generateTimeline = async (tickInterval: number) => {
@@ -141,7 +183,16 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
 
     return (
         <div className={styles.wrapper}>
-            <div className={styles.timeline_wrapper}>
+            <div className={styles.top}>
+                {/* 구간 선택 박스 */}
+                <TimelineSelectBox
+                    ranges={ranges}
+                    selectedRangeId={selectedRangeId}
+                    setSelectedRangeId={setSelectedRangeId}
+                />
+            </div>
+
+            <div ref={scrollRef} className={styles.middle}>
                 <div className={styles.timeline_container} style={{ width: timelineWidth }}>
                     {/* 타임라인 틱 */}
                     <TimelineTicks duration={duration} timelineWidth={timelineWidth} tickInterval={tickInterval} />
@@ -176,9 +227,73 @@ export const ThumbnailTimeline: React.FC<ThumbnailTimelineProps> = ({
                 </div>
             </div>
 
-            {/* 타임라인 틱 슬라이더 */}
-            <TimelineSlider onChnageSlider={onChnageSlider} />
+            <div className={styles.bottom}>
+                {/* 타임라인 틱 슬라이더 */}
+                <TimelineSlider onChnageSlider={onChnageSlider} />
+                {/* 컨트롤 버튼 */}
+                <Controls
+                    ranges={ranges}
+                    setRanges={setRanges}
+                    setIsMerging={setIsMerging}
+                    mergedVideoRef={mergedVideoRef}
+                    selectedRangeId={selectedRangeId}
+                    setSelectedRangeId={setSelectedRangeId}
+                />
+            </div>
         </div>
+    );
+};
+
+// ===================== Timeline Select Box 컴포넌트 =====================
+interface TimelineSelectBoxProps {
+    ranges: { id: string; start: number; end: number }[];
+    selectedRangeId: string | null;
+    setSelectedRangeId: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+const TimelineSelectBox: React.FC<TimelineSelectBoxProps> = ({ ranges, selectedRangeId, setSelectedRangeId }) => {
+    const sortedRanges = [...ranges].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+    return (
+        <FormControl
+            size="small"
+            sx={{
+                minWidth: 260,
+                borderRadius: 2,
+                color: "#f5f5f5",
+                "& .MuiInputBase-root": {
+                    backgroundColor: "#2a2a2a",
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#555",
+                },
+            }}
+        >
+            <InputLabel id="select-label" sx={{ color: "#bbb" }}>
+                선택 범위
+            </InputLabel>
+
+            <Select
+                labelId="select-label"
+                id="timeline-select"
+                value={selectedRangeId || ""}
+                onChange={(e) => setSelectedRangeId(e.target.value)}
+                label="선택 범위"
+                sx={{
+                    color: "#f5f5f5",
+                    "& .MuiSelect-icon": {
+                        color: "#aaa",
+                    },
+                }}
+            >
+                <MenuItem value="">선택 안함</MenuItem>
+                {sortedRanges.map((range, index) => (
+                    <MenuItem key={range.id} value={range.id}>
+                        {`[${index + 1}] ${getFormatTime(range.start)} ~ ${getFormatTime(range.end)}`}
+                    </MenuItem>
+                ))}
+            </Select>
+        </FormControl>
     );
 };
 
@@ -397,7 +512,6 @@ const Timeline: React.FC<TimelineProps> = ({
         setRanges((prevRanges) => prevRanges.map((range) => (range.id === draggingId ? updatedRange : range)));
 
         setDraggingId(null);
-        setSelectedRangeId(null);
     };
 
     /** 드래그된 핸들에 따라 범위를 업데이트하는 함수 */
@@ -461,7 +575,6 @@ const Timeline: React.FC<TimelineProps> = ({
                 prevRange.id === rangeId ? { ...prevRange, start: newStart, end: newEnd } : prevRange
             )
         );
-        setSelectedRangeId(null);
     };
 
     /** 범위 드래그 종료 */
@@ -606,6 +719,166 @@ const ThumbnailsRender: React.FC<ThumnailRenderProps> = ({ timelineImages }) => 
     );
 };
 
+interface ControlsProps {
+    ranges: { id: string; start: number; end: number }[];
+    setRanges: React.Dispatch<React.SetStateAction<{ id: string; start: number; end: number }[]>>;
+    setIsMerging: React.Dispatch<React.SetStateAction<boolean>>;
+    mergedVideoRef: React.RefObject<HTMLVideoElement | null>;
+    selectedRangeId: string | null;
+    setSelectedRangeId: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+// ===================== Controls 컴포넌트 =====================
+const Controls = ({
+    ranges,
+    setRanges,
+    setIsMerging,
+    mergedVideoRef,
+    selectedRangeId,
+    setSelectedRangeId,
+}: ControlsProps) => {
+    const [m3u8FileObject, setM3u8FileObject] = useState<
+        { accumulatedTime: number; duration: string; tsFile: string }[]
+    >([]);
+
+    useEffect(() => {
+        fetch(`${SERVER_API_URL}/api/hls`)
+            .then((res) => res.text())
+            .then((m3u8Text) => {
+                const tsArray = [];
+                let accumulatedTime = 0;
+                const regex = /#EXTINF:(\d+\.\d+),\s*(\S+\.ts)/g;
+                let match;
+
+                // 정규식을 사용해 #EXTINF와 ts 파일을 찾아서 배열로 저장
+                while ((match = regex.exec(m3u8Text)) !== null) {
+                    accumulatedTime += parseFloat(match[1]);
+                    tsArray.push({
+                        accumulatedTime: accumulatedTime,
+                        duration: match[1],
+                        tsFile: match[2],
+                    });
+                }
+
+                // 결과 배열 저장
+                setM3u8FileObject(tsArray);
+            });
+    }, []);
+
+    /** 선택 범위 삭제 */
+    const handleRangeDelete = () => {
+        if (!selectedRangeId) {
+            alert("삭제할 범위를 선택해 주세요.");
+            return;
+        }
+
+        setRanges((prevRanges) => prevRanges.filter((range) => range.id !== selectedRangeId));
+        setSelectedRangeId(null);
+    };
+
+    /** 선택 범위 초기화 */
+    const handleRangeClear = () => {
+        if (ranges.length === 0) {
+            alert("존재하는 범위가 없습니다.");
+            return;
+        }
+        setRanges([]);
+        setSelectedRangeId(null);
+    };
+
+    /** M3U8 파일을 병합하여 새로운 M3U8 콘텐츠 생성 */
+    const generateMergedM3U8 = (
+        ranges: { start: number; end: number }[],
+        m3u8FileObject: { accumulatedTime: number; duration: string; tsFile: string }[]
+    ) => {
+        if (!ranges || ranges.length === 0) {
+            alert("병합할 범위를 선택해 주세요.");
+            return null;
+        }
+
+        let newM3U8Content = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:12\n#EXT-X-MEDIA-SEQUENCE:0\n";
+        let previousEndTime = 0;
+
+        const filteredTsFiles = m3u8FileObject.filter(({ accumulatedTime }) =>
+            ranges.some((range) => accumulatedTime >= range.start && accumulatedTime <= range.end)
+        );
+
+        filteredTsFiles.forEach((file, index) => {
+            if (index > 0 && file.accumulatedTime !== previousEndTime) {
+                newM3U8Content += "#EXT-X-DISCONTINUITY\n";
+            }
+
+            newM3U8Content += `#EXTINF:${file.duration},\n${file.tsFile}\n`;
+            previousEndTime = file.accumulatedTime + Number(file.duration);
+        });
+
+        newM3U8Content += "#EXT-X-ENDLIST";
+
+        return newM3U8Content;
+    };
+
+    /** 새로운 M3U8 파일을 서버에 업데이트 */
+    const updateM3U8File = async (m3u8Content: string) => {
+        try {
+            await fetch(`${SERVER_API_URL}/api/hls/update`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ m3u8Content }),
+            });
+        } catch (error) {
+            console.error("Error updating m3u8:", error);
+            throw error;
+        }
+    };
+
+    /** 플레이어 초기화 */
+    const initializePlayer = () => {
+        if (!mergedVideoRef.current) return;
+
+        const player = new Plyr(mergedVideoRef.current, {
+            autoplay: true,
+            muted: true,
+            tooltips: { controls: true },
+            keyboard: { global: true },
+        });
+
+        if (!Hls.isSupported()) {
+            console.error("Hls.js를 지원하지 않는 브라우저입니다.");
+            return;
+        }
+
+        const hls = new Hls();
+        hls.loadSource(`${SERVER_API_URL}/api/updated_playlist.m3u8`);
+        hls.attachMedia(mergedVideoRef.current);
+        player.play();
+    };
+
+    /** 병합 실행 함수 */
+    const handleMerge = async () => {
+        const newM3U8Content = generateMergedM3U8(ranges, m3u8FileObject);
+        if (!newM3U8Content) return;
+
+        setIsMerging(true);
+
+        try {
+            await updateM3U8File(newM3U8Content);
+            initializePlayer();
+        } catch (error) {
+            console.error("M3U8 병합 및 플레이어 초기화 실패:", error);
+        }
+    };
+
+    return (
+        <div className={styles.controls}>
+            <button onClick={handleRangeClear}>Clear</button>
+            <button onClick={handleRangeDelete}>Delete</button>
+            <button className={styles.btn_main} onClick={handleMerge}>
+                Merge
+            </button>
+        </div>
+    );
+};
+
 // ===================== Timeline Marker 컴포넌트 =====================
 interface TimelineMarkerProps {
     player: Plyr | null;
@@ -691,37 +964,35 @@ interface TimelineSliderProps {
 
 const TimelineSlider: React.FC<TimelineSliderProps> = ({ onChnageSlider }) => {
     return (
-        <div className={styles.timeline_slider_wrapper}>
-            <div className={styles.timeline_slider}>
-                <Slider
-                    aria-label="Restricted values"
-                    defaultValue={50}
-                    step={null}
-                    valueLabelDisplay="auto"
-                    onChange={onChnageSlider}
-                    marks={sliderMarks}
-                    sx={{
-                        "& .MuiSlider-rail": {
-                            backgroundColor: "#ccc",
-                        },
-                        "& .MuiSlider-mark": {
-                            backgroundColor: "#fff",
-                        },
-                        "& .MuiSlider-markActive": {
-                            backgroundColor: "#0056b3",
-                        },
-                        "& .MuiSlider-markLabel": {
-                            color: "#fff",
-                        },
-                        "& .MuiSlider-markLabelActive": {
-                            color: "#007bff",
-                        },
-                        "& .MuiSlider-valueLabel": {
-                            display: "none",
-                        },
-                    }}
-                />
-            </div>
+        <div className={styles.timeline_slider}>
+            <Slider
+                aria-label="Restricted values"
+                defaultValue={50}
+                step={null}
+                valueLabelDisplay="auto"
+                onChange={onChnageSlider}
+                marks={sliderMarks}
+                sx={{
+                    "& .MuiSlider-rail": {
+                        backgroundColor: "#ccc",
+                    },
+                    "& .MuiSlider-mark": {
+                        backgroundColor: "#fff",
+                    },
+                    "& .MuiSlider-markActive": {
+                        backgroundColor: "#0056b3",
+                    },
+                    "& .MuiSlider-markLabel": {
+                        color: "#fff",
+                    },
+                    "& .MuiSlider-markLabelActive": {
+                        color: "#007bff",
+                    },
+                    "& .MuiSlider-valueLabel": {
+                        display: "none",
+                    },
+                }}
+            />
         </div>
     );
 };

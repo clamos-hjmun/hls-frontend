@@ -17,6 +17,6 @@ export const getFormatTime = (time: number): string => {
     } else if (minutes > 0) {
         return `${formattedMinutes}:${formattedSeconds}`;
     } else {
-        return formattedSeconds;
+        return `00:${formattedSeconds}`;
     }
 };
