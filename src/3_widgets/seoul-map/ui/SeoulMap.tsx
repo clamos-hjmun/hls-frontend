@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Select, MenuItem, InputLabel, FormControl, Checkbox, FormControlLabel } from "@mui/material";
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps";
 import { Feature, Tooltip, TooltipStation, HoverTooltip, EnrichedStation } from "../types";
@@ -15,6 +15,10 @@ export const SeoulMap = () => {
         return Array.from(new Set(sggnms));
     }, [geoData]);
 
+    const [windowSize, setWindowSize] = useState<{ width: number; height: number }>({
+        width: window.innerWidth,
+        height: window.innerHeight,
+    });
     const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
     const [selectedStationName, setSelectedStationName] = useState<string | null>(null);
     const [showStations, setShowStations] = useState<boolean>(true);
@@ -30,6 +34,23 @@ export const SeoulMap = () => {
             })
         )
     );
+
+    // 윈도우 리사이즈 감지
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowSize({
+                width: window.innerWidth,
+                height: window.innerHeight,
+            });
+        };
+
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    // 지도 크기 설정
+    const mapWidth = windowSize.width - 300; // 사이드바 고려
+    const mapHeight = Math.min(windowSize.height * 0.8, 800); // 최대 800 제한
 
     /** 구역 마다 줌 레벨을 계산하는 함수 */
     const calculateZoomLevel = (bbox: [number, number, number, number]) => {
@@ -137,8 +158,8 @@ export const SeoulMap = () => {
             <ComposableMap
                 projection="geoMercator"
                 projectionConfig={{ scale: 130000, center: [126.986, 37.5665] }}
-                width={1000}
-                height={800}
+                width={mapWidth}
+                height={mapHeight}
                 style={{ width: "calc(100% - 300px", height: "auto" }}
             >
                 <ZoomableGroup center={mapCenter} zoom={mapZoom} minZoom={0.8} maxZoom={20}>
