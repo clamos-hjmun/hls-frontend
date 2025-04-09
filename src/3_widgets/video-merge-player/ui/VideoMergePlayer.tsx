@@ -73,10 +73,10 @@ const Description = () => {
     ];
 
     const warningList = [
-        <>
-            타임라인을 이용한 드래그의 경우 더블 클릭 이벤트와 구분하기 위해 클릭 후{" "}
+        <Fragment>
+            • 타임라인을 이용한 드래그의 경우 더블 클릭 이벤트와 구분하기 위해 클릭 후{" "}
             <strong className={styles.highlight}>250ms</strong> 이후 시작점이 지정됩니다.
-        </>,
+        </Fragment>,
     ];
 
     return (

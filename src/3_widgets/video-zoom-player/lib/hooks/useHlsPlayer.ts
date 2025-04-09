@@ -6,6 +6,7 @@ const SERVER_API_URL = import.meta.env.VITE_SERVER_API_URL;
 
 export const useHlsPlayer = (videoRef: React.RefObject<HTMLVideoElement | null>) => {
     const [videoRatio, setVideoRatio] = useState(1);
+    const [isPaused, setIsPaused] = useState(false);
     const [duration, setDuration] = useState(0);
 
     useEffect(() => {
@@ -35,6 +36,14 @@ export const useHlsPlayer = (videoRef: React.RefObject<HTMLVideoElement | null>)
             }
         });
 
+        player.on("pause", () => {
+            setIsPaused(true);
+        });
+
+        player.on("play", () => {
+            setIsPaused(false);
+        });
+
         player.on("loadeddata", () => {
             if (videoRef.current) {
                 const { videoWidth, videoHeight } = videoRef.current;
@@ -47,5 +56,5 @@ export const useHlsPlayer = (videoRef: React.RefObject<HTMLVideoElement | null>)
         return () => player.destroy();
     }, []);
 
-    return { videoRatio, duration };
+    return { videoRatio, duration, isPaused };
 };

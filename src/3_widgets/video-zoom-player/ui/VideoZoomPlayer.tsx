@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useHlsPlayer, useZoomAndPan } from "../lib";
+import { useEffect, useState, useRef, Fragment } from "react";
 import { DEFAULT_MINIMAP_WIDTH, MINIMAP_MAX_WIDTH, MINIMAP_MIN_WIDTH, FPS } from "../lib";
-import { VideoCaptureButton } from "./VideoCaptureButton";
 import { ZoomIcons, MoveIcons, DescriptionIcons } from "../icon";
+import { useHlsPlayer, useZoomAndPan } from "../lib";
+import VideoCapturePopup from "./VideoCapturePopup";
 import styles from "./VideoZoomPlayer.module.scss";
 import "plyr/dist/plyr.css";
 
@@ -11,10 +11,12 @@ export const VideoZoomPlayer = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const flashRef = useRef<HTMLDivElement>(null);
     const minimapRef = useRef<HTMLDivElement>(null);
     const minimapViewportRef = useRef<HTMLDivElement>(null);
     const [showZoom, setShowZoom] = useState(false);
-    const { videoRatio } = useHlsPlayer(videoRef);
+    const [capturedImages, setCapturedImages] = useState<string[]>([]);
+    const { videoRatio, isPaused } = useHlsPlayer(videoRef);
     const { zoom, position, setIsDragging, setDragStart, handleZoomMove } = useZoomAndPan(
         containerRef,
         minimapRef,
@@ -71,43 +73,58 @@ export const VideoZoomPlayer = () => {
         }
     };
 
+    /** 캡쳐 이미지 삭제 핸들러 */
+    const handleCaptureDelete = (image: string) => {
+        setCapturedImages((prev) => prev.filter((img) => img !== image));
+    };
+
     return (
         <div className={styles.wrapper}>
-            <div ref={containerRef} className={styles.top}>
-                <video ref={videoRef} className={styles.video} style={{ transform: videoTransform }} />
-                {/* 비디오 드래그하여 화면 이동 */}
-                {zoom > 1 && <canvas ref={canvasRef} className={styles.canvas} onMouseDown={onMouseDownHandler} />}
-                {/* 줌 레벨 */}
-                <ZoomLevel zoom={zoom} showZoom={showZoom} />
-                {/* 미니맵 */}
-                <MiniMap
-                    zoom={zoom}
-                    position={position}
-                    containerRef={containerRef}
-                    minimapRef={minimapRef}
-                    minimapViewportRef={minimapViewportRef}
-                    minimapWidth={minimapWidth}
-                    minimapHeight={minimapHeight}
-                    onMouseDownHandler={onMouseDownHandler}
-                />
-            </div>
-
-            <div className={styles.bottom}>
-                {/* 사용 방법 설명 */}
-                <Description />
-                <div className={styles.button_group}>
-                    {/* 줌 컨트롤러 */}
-                    <ZoomController move={handleZoomMove} />
-                    {/* FPS 컨트롤러 */}
-                    <FpsController step={handleFrameStep} />
-                    {/* 캡처 버튼 */}
-                    <VideoCaptureButton
-                        video={videoRef.current}
+            <div className={styles.left_container}>
+                <div ref={containerRef} className={styles.top}>
+                    <video ref={videoRef} className={styles.video} style={{ transform: videoTransform }} />
+                    {/* 비디오 드래그하여 화면 이동 */}
+                    {zoom > 1 && <canvas ref={canvasRef} className={styles.canvas} onMouseDown={onMouseDownHandler} />}
+                    {/* 줌 레벨 */}
+                    <ZoomLevel zoom={zoom} showZoom={showZoom} />
+                    {/* 미니맵 */}
+                    <MiniMap
                         zoom={zoom}
                         position={position}
+                        containerRef={containerRef}
                         minimapRef={minimapRef}
+                        minimapViewportRef={minimapViewportRef}
+                        minimapWidth={minimapWidth}
+                        minimapHeight={minimapHeight}
+                        onMouseDownHandler={onMouseDownHandler}
                     />
+                    {/* 비디오 캡쳐 시 플래시 효과 */}
+                    <div ref={flashRef} className={styles.flash} />
                 </div>
+
+                <div className={styles.bottom}>
+                    {/* 사용 방법 설명 */}
+                    <Description />
+                    <div className={styles.button_group}>
+                        {/* 줌 컨트롤러 */}
+                        <ZoomController move={handleZoomMove} />
+                        {/* FPS 컨트롤러 */}
+                        <FpsController step={handleFrameStep} />
+                        {/* 캡처 버튼 */}
+                        <VideoCaptureButton
+                            video={videoRef.current}
+                            zoom={zoom}
+                            isPaused={isPaused}
+                            position={position}
+                            minimapRef={minimapRef}
+                            flashRef={flashRef}
+                            setCapturedImages={setCapturedImages}
+                        />
+                    </div>
+                </div>
+            </div>
+            <div className={styles.right_container}>
+                <CaptuerCards capturedImages={capturedImages} onDelete={handleCaptureDelete} />
             </div>
         </div>
     );
@@ -120,11 +137,7 @@ interface ZoomLevelProps {
 }
 
 const ZoomLevel = ({ zoom, showZoom }: ZoomLevelProps) => {
-    return (
-        <React.Fragment>
-            {showZoom && <div className={styles.zoom_level}>{`${Math.round(zoom * 100)}%`}</div>}
-        </React.Fragment>
-    );
+    return <Fragment>{showZoom && <div className={styles.zoom_level}>{`${Math.round(zoom * 100)}%`}</div>}</Fragment>;
 };
 
 // ===================== MiniMap 컴포넌트 =====================
@@ -248,6 +261,70 @@ export const FpsController = ({ step }: FpsControllerProps) => {
     );
 };
 
+// ===================== VideoCapture Button 컴포넌트 =====================
+
+interface VideoCaptureButtonProps {
+    video: HTMLVideoElement | null;
+    zoom: number;
+    isPaused: boolean;
+    position: { x: number; y: number };
+    minimapRef: React.RefObject<HTMLDivElement | null>;
+    flashRef: React.RefObject<HTMLDivElement | null>;
+    setCapturedImages: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+export const VideoCaptureButton = ({
+    video,
+    zoom,
+    isPaused,
+    position,
+    minimapRef,
+    flashRef,
+    setCapturedImages,
+}: VideoCaptureButtonProps) => {
+    const captureVideoFrame = () => {
+        if (!video) return;
+
+        if (flashRef.current) {
+            flashRef.current.classList.add(styles.active);
+            setTimeout(() => {
+                flashRef.current?.classList.remove(styles.active);
+            }, 500);
+        }
+
+        const scale = zoom;
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+
+        const visibleWidth = videoWidth / scale;
+        const visibleHeight = videoHeight / scale;
+
+        const offsetX = (position.x / (minimapRef.current?.offsetWidth || 1)) * videoWidth;
+        const offsetY = (position.y / (minimapRef.current?.offsetHeight || 1)) * videoHeight;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = visibleWidth;
+        canvas.height = visibleHeight;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.drawImage(video, offsetX, offsetY, visibleWidth, visibleHeight, 0, 0, visibleWidth, visibleHeight);
+
+        const dataUrl = canvas.toDataURL("image/png");
+
+        setCapturedImages((prev) => [...prev, dataUrl]);
+    };
+
+    return (
+        <div className={styles.video_capture}>
+            <button onClick={captureVideoFrame} className={isPaused ? "" : styles.disabled} disabled={!isPaused}>
+                Capture
+            </button>
+        </div>
+    );
+};
+
 // ===================== Description 컴포넌트 =====================
 const Description = () => {
     const usageList = [
@@ -265,12 +342,11 @@ const Description = () => {
     ];
 
     const warningList = [
-        <>
-            미니맵은 화면이 확대된 경우에만 <strong className={styles.highlight}>활성화</strong>됩니다.
-            <br />
-            화면이 확대된 경우 비디오 클릭으로 중지 및 재생이 <strong className={styles.highlight}>불가능</strong>
-            합니다.
-        </>,
+        <Fragment>
+            • 미니맵은 화면이 확대된 경우에만 <strong className={styles.highlight}>활성화</strong>됩니다.
+            <br />• 화면이 확대된 경우 비디오 클릭이 <strong className={styles.highlight}>제한</strong>됩니다.
+            <br />• 비디오가 중지된 상태에서만 <span className={styles.highlight}>캡쳐</span>가 가능합니다.
+        </Fragment>,
     ];
 
     return (
@@ -289,13 +365,109 @@ const Description = () => {
                 <h3 className={styles.warningTitle}>주의 사항</h3>
                 <p className={styles.warningText}>
                     {warningList.map((item, index) => (
-                        <React.Fragment key={index}>
+                        <Fragment key={index}>
                             {item}
                             <br />
-                        </React.Fragment>
+                        </Fragment>
                     ))}
                 </p>
             </div>
+        </div>
+    );
+};
+
+// ===================== Captuer Cards 컴포넌트 =====================
+interface CaptuerCardsProps {
+    capturedImages: string[];
+    onDelete: (image: string) => void;
+}
+
+const CaptuerCards = ({ capturedImages, onDelete }: CaptuerCardsProps) => {
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+    return (
+        <div className={styles.capture_cards}>
+            {capturedImages.map((image, index) => (
+                <CaptureCard key={index} image={image} setSelectedImage={setSelectedImage} onDelete={onDelete} />
+            ))}
+
+            {selectedImage && <VideoCapturePopup imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />}
+        </div>
+    );
+};
+
+interface CaptureCardProps {
+    image: string;
+    setSelectedImage: React.Dispatch<React.SetStateAction<string | null>>;
+    onDelete: (index: string) => void;
+}
+
+const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) => {
+    const [progress, setProgress] = useState(0);
+    const [isHovered, setIsHovered] = useState(false);
+    const isComplete = progress === 100;
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setProgress((prev) => {
+                if (prev >= 100) {
+                    clearInterval(interval);
+                    return 100;
+                }
+                return prev + 1;
+            });
+        }, 20);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    /** 이미지 다운로드 함수 */
+    const handleDownload = () => {
+        const link = document.createElement("a");
+        link.href = image;
+        link.download = `capture-${Date.now()}.png`;
+        link.click();
+    };
+
+    /** 확대된 이미지 보기 함수 */
+    const onViewDetail = () => {
+        setSelectedImage(image);
+    };
+
+    const handleDelete = () => {
+        onDelete(image);
+    };
+
+    return (
+        <div
+            className={styles.capture_card}
+            onDoubleClick={onViewDetail}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {/* 이미지 영역 */}
+            <div
+                className={`${styles.preview} ${isComplete ? styles.visible : styles.dimmed} ${isHovered ? styles.blurred : ""}`}
+            >
+                <img src={image} alt="Captured" />
+                {/* 호버 시 버튼 표시 */}
+                {isHovered && (
+                    <div className={styles.actions}>
+                        <button onClick={onViewDetail}>자세히 보기</button>
+                        <button onClick={handleDownload}>다운로드</button>
+                        <button onClick={handleDelete} className={styles.warning}>
+                            삭제
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* 프로그레스 바 */}
+            {!isComplete && (
+                <div className={styles.progress_bar}>
+                    <div className={styles.progress_fill} style={{ width: `${progress}%` }} />
+                </div>
+            )}
         </div>
     );
 };

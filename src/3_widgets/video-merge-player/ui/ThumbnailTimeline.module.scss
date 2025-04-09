@@ -15,24 +15,6 @@
     padding: 0 20px;
     overflow-y: hidden;
     user-select: none;
-
-    &::-webkit-scrollbar {
-        height: 8px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: #2a2d32;
-        border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: #52575d;
-        border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-        background: #6b7178;
-    }
 }
 
 .timeline_container {
