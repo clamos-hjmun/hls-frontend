@@ -2,6 +2,7 @@ import { useState } from "react";
 import { VideoZoomPlayer } from "@/3_widgets/video-zoom-player";
 import { VideoMergePlayer } from "@/3_widgets/video-merge-player";
 import { VideoPreviewList } from "@/3_widgets/video-preview-list";
+import { SeoulMap } from "@/3_widgets/seoul-map";
 import styles from "./HomePage.module.scss";
 
 export const HomePage = () => {
@@ -34,6 +35,12 @@ export const HomePage = () => {
                 >
                     3. Video Preview
                 </button>
+                <button
+                    className={`${styles.tab} ${tabNum === 4 ? styles.active : ""}`}
+                    onClick={() => handleChange(4)}
+                >
+                    4. Seoul Map
+                </button>
             </div>
 
             {/* 탭 내용 */}
@@ -41,6 +48,7 @@ export const HomePage = () => {
                 {tabNum === 1 && <VideoZoomPlayer />}
                 {tabNum === 2 && <VideoMergePlayer />}
                 {tabNum === 3 && <VideoPreviewList />}
+                {tabNum === 4 && <SeoulMap />}
             </div>
         </div>
     );
