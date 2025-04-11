@@ -11,11 +11,14 @@ export const VideoZoomPlayer = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const enhanceRef = useRef<HTMLCanvasElement>(null);
     const flashRef = useRef<HTMLDivElement>(null);
     const minimapRef = useRef<HTMLDivElement>(null);
     const minimapViewportRef = useRef<HTMLDivElement>(null);
     const [showZoom, setShowZoom] = useState(false);
-    const [capturedImages, setCapturedImages] = useState<string[]>([]);
+    const [showEnhance, setShowEnhance] = useState(false);
+    const [enhanceRect, setEnhanceRect] = useState({ x: 0, y: 0 });
+    const [capturedImages, setCapturedImages] = useState<{ type: number; src: string }[]>([]);
     const { videoRatio, isPaused } = useHlsPlayer(videoRef);
     const { zoom, position, setIsDragging, setDragStart, handleZoomMove } = useZoomAndPan(
         containerRef,
@@ -33,29 +36,40 @@ export const VideoZoomPlayer = () => {
     const minimapWidth = Math.min(Math.max(DEFAULT_MINIMAP_WIDTH, MINIMAP_MIN_WIDTH), MINIMAP_MAX_WIDTH);
     const minimapHeight = minimapWidth / videoRatio;
 
+    // zoom 상태 변화 감지
     useEffect(() => {
-        const restartButton = document.querySelector<HTMLButtonElement>(
-            ".plyr--full-ui.plyr--video .plyr__control--overlaid"
-        );
-
-        // 확대할 때 중앙 실행 버튼이 비디오를 가리는 문제 해결
-        const setRestartButtonVisible = (isVisible: boolean) => {
-            if (restartButton) {
-                restartButton.style.display = isVisible ? "block" : "none";
-            }
-        };
-
         if (zoom > 1) {
             setShowZoom(true);
-            setRestartButtonVisible(false);
+            setButtonVisible(false);
 
+            // 일정 시간 후 확대 강조 UI 제거
             const timer = setTimeout(() => setShowZoom(false), 500);
             return () => clearTimeout(timer);
         }
 
         setShowZoom(false);
-        setRestartButtonVisible(true);
+        setButtonVisible(true);
     }, [zoom]);
+
+    // showEnhance 상태 변화 감지
+    useEffect(() => {
+        setButtonVisible(!showEnhance);
+    }, [showEnhance]);
+
+    /** 비디오 컨트롤 버튼 보이기/숨기기 */
+    const setButtonVisible = (isVisible: boolean) => {
+        const restartButton = document.querySelector<HTMLButtonElement>(
+            ".plyr--full-ui.plyr--video .plyr__control--overlaid"
+        );
+        const controls = document.querySelector<HTMLDivElement>(".plyr__controls");
+
+        if (restartButton) {
+            restartButton.style.display = isVisible ? "block" : "none";
+        }
+        if (controls) {
+            controls.style.display = isVisible ? "flex" : "none";
+        }
+    };
 
     /** 비디오 드래그 이벤트 핸들러 */
     const onMouseDownHandler = (e: React.MouseEvent) => {
@@ -75,7 +89,64 @@ export const VideoZoomPlayer = () => {
 
     /** 캡쳐 이미지 삭제 핸들러 */
     const handleCaptureDelete = (image: string) => {
-        setCapturedImages((prev) => prev.filter((img) => img !== image));
+        setCapturedImages((prev) => prev.filter((img) => img.src !== image));
+    };
+
+    /** 비디오 화질 개선 캡쳐 핸들러 */
+    const handleEnhanceSave = () => {
+        if (!videoRef.current || !enhanceRef.current) return;
+
+        const video = videoRef.current;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        if (video.readyState < 2) {
+            console.warn("Video not ready for capture");
+            return;
+        }
+
+        // 비디오 원본 해상도
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+
+        // 화면 상 렌더링 크기
+        const displayWidth = video.clientWidth;
+        const displayHeight = video.clientHeight;
+
+        // 비율 계산
+        const scaleX = videoWidth / displayWidth;
+        const scaleY = videoHeight / displayHeight;
+
+        // enhanceRect는 UI 기준 좌표이므로 비율 반영
+        const sx = enhanceRect.x * scaleX;
+        const sy = enhanceRect.y * scaleY;
+
+        // 고정된 추출 크기 (비디오 원본 해상도 기준으로 변환)
+        const sw = 400 * scaleX;
+        const sh = 400 * scaleY;
+
+        // 저장할 캔버스 크기 (출력 해상도 고정)
+        canvas.width = 400;
+        canvas.height = 400;
+
+        // 비디오의 원하는 영역을 캔버스에 그림
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL("image/png");
+        setCapturedImages((prev) => [
+            ...prev,
+            {
+                type: 2,
+                src: dataUrl,
+            },
+        ]);
+
+        // 강조 박스 지우기
+        const enhanceCtx = enhanceRef.current.getContext("2d");
+        if (enhanceCtx) {
+            enhanceCtx.clearRect(0, 0, enhanceRef.current.width, enhanceRef.current.height);
+        }
     };
 
     return (
@@ -98,6 +169,16 @@ export const VideoZoomPlayer = () => {
                         minimapHeight={minimapHeight}
                         onMouseDownHandler={onMouseDownHandler}
                     />
+                    {/* 비디오 화질 개선 영역 */}
+                    <VideoEnhance
+                        enhanceRef={enhanceRef}
+                        showEnhance={showEnhance}
+                        enhanceRect={enhanceRect}
+                        containerRef={containerRef}
+                        videoRef={videoRef}
+                        setEnhanceRect={setEnhanceRect}
+                    />
+
                     {/* 비디오 캡쳐 시 플래시 효과 */}
                     <div ref={flashRef} className={styles.flash} />
                 </div>
@@ -119,6 +200,15 @@ export const VideoZoomPlayer = () => {
                             minimapRef={minimapRef}
                             flashRef={flashRef}
                             setCapturedImages={setCapturedImages}
+                        />
+                        {/* 비디오 화질 개선 버튼 */}
+                        <VideoEnhanceButton
+                            showEnhance={showEnhance}
+                            handleZoomMove={handleZoomMove}
+                            setEnhanceRect={setEnhanceRect}
+                            setShowEnhance={setShowEnhance}
+                            handleEnhanceSave={handleEnhanceSave}
+                            isPaused={isPaused}
                         />
                     </div>
                 </div>
@@ -270,7 +360,7 @@ interface VideoCaptureButtonProps {
     position: { x: number; y: number };
     minimapRef: React.RefObject<HTMLDivElement | null>;
     flashRef: React.RefObject<HTMLDivElement | null>;
-    setCapturedImages: React.Dispatch<React.SetStateAction<string[]>>;
+    setCapturedImages: React.Dispatch<React.SetStateAction<{ type: number; src: string }[]>>;
 }
 
 export const VideoCaptureButton = ({
@@ -313,7 +403,7 @@ export const VideoCaptureButton = ({
 
         const dataUrl = canvas.toDataURL("image/png");
 
-        setCapturedImages((prev) => [...prev, dataUrl]);
+        setCapturedImages((prev) => [...prev, { type: 1, src: dataUrl }]);
     };
 
     return (
@@ -321,6 +411,139 @@ export const VideoCaptureButton = ({
             <button onClick={captureVideoFrame} className={isPaused ? "" : styles.disabled} disabled={!isPaused}>
                 Capture
             </button>
+        </div>
+    );
+};
+
+// ===================== Video Enhance 컴포넌트 =====================
+interface VideoEnhanceProps {
+    enhanceRef: React.RefObject<HTMLCanvasElement | null>;
+    showEnhance: boolean;
+    enhanceRect: { x: number; y: number };
+    containerRef: React.RefObject<HTMLDivElement | null>;
+    videoRef: React.RefObject<HTMLVideoElement | null>;
+    setEnhanceRect: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+}
+
+const VideoEnhance = ({ enhanceRef, showEnhance, enhanceRect, containerRef, setEnhanceRect }: VideoEnhanceProps) => {
+    const dragOffset = useRef({ x: 0, y: 0 });
+    const [isDraggingEnhance, setIsDraggingEnhance] = useState(false);
+
+    // 드래그 시작
+    const handleEnhanceMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsDraggingEnhance(true);
+        dragOffset.current = {
+            x: e.clientX - enhanceRect.x,
+            y: e.clientY - enhanceRect.y,
+        };
+    };
+
+    // 드래그 중
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isDraggingEnhance || !containerRef.current) return;
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const newX = e.clientX - dragOffset.current.x;
+        const newY = e.clientY - dragOffset.current.y;
+        // 비디오 영역 밖으로 나가지 않도록 제한
+        const maxX = containerRect.width - 400;
+        const maxY = containerRect.height - 400;
+        setEnhanceRect({
+            x: Math.max(0, Math.min(newX, maxX)),
+            y: Math.max(0, Math.min(newY, maxY)),
+        });
+    };
+
+    // 드래그 종료
+    const handleMouseUp = () => {
+        setIsDraggingEnhance(false);
+    };
+
+    useEffect(() => {
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [isDraggingEnhance]);
+
+    useEffect(() => {
+        const blurLayer = document.querySelector(`.${styles.blur_layer}`) as HTMLElement;
+        if (blurLayer) {
+            const centerX = enhanceRect.x + 200;
+            const centerY = enhanceRect.y + 200;
+
+            blurLayer.style.setProperty("--hole-x", `${centerX}px`);
+            blurLayer.style.setProperty("--hole-y", `${centerY}px`);
+        }
+    }, [enhanceRect]);
+
+    return (
+        <Fragment>
+            {showEnhance && (
+                <div className={styles.enhance_overlay}>
+                    <div className={styles.blur_layer} />
+                    <canvas
+                        ref={enhanceRef}
+                        className={styles.enhance_focus}
+                        style={{
+                            left: enhanceRect.x,
+                            top: enhanceRect.y,
+                        }}
+                        onMouseDown={handleEnhanceMouseDown}
+                    />
+                </div>
+            )}
+        </Fragment>
+    );
+};
+
+// ===================== Video Enhance Button컴포넌트 =====================
+interface VideoEnhanceButtonProps {
+    showEnhance: boolean;
+    handleZoomMove: (type: ZoomAction) => void;
+    setEnhanceRect: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+    setShowEnhance: React.Dispatch<React.SetStateAction<boolean>>;
+    handleEnhanceSave: () => void;
+    isPaused: boolean;
+}
+
+const VideoEnhanceButton = ({
+    showEnhance,
+    handleZoomMove,
+    setEnhanceRect,
+    setShowEnhance,
+    handleEnhanceSave,
+    isPaused,
+}: VideoEnhanceButtonProps) => {
+    return (
+        <div className={styles.enhance_button}>
+            {showEnhance ? (
+                <div className={styles.enhance_button_group}>
+                    <button
+                        onClick={() => {
+                            setShowEnhance((prev) => !prev);
+                        }}
+                    >
+                        Cancel
+                    </button>
+
+                    <button onClick={handleEnhanceSave}>Save</button>
+                </div>
+            ) : (
+                <button
+                    onClick={() => {
+                        handleZoomMove("RESET");
+                        setEnhanceRect({ x: 0, y: 0 });
+                        setShowEnhance((prev) => !prev);
+                    }}
+                    className={isPaused ? "" : styles.disabled}
+                    disabled={!isPaused}
+                >
+                    Enhance
+                </button>
+            )}
         </div>
     );
 };
@@ -337,7 +560,11 @@ const Description = () => {
         },
         {
             icon: <DescriptionIcons.Capture className={styles.icon} />,
-            text: "Capture 버튼을 클릭 시 캡쳐 이미지 화질 개선(예정)",
+            text: "Capture 버튼을 클릭 시 비디오 캡쳐",
+        },
+        {
+            icon: <DescriptionIcons.Enhance className={styles.icon} />,
+            text: "Enhance 버튼을 클릭 시 비디오 화질 개선",
         },
     ];
 
@@ -378,7 +605,7 @@ const Description = () => {
 
 // ===================== Captuer Cards 컴포넌트 =====================
 interface CaptuerCardsProps {
-    capturedImages: string[];
+    capturedImages: { type: number; src: string }[];
     onDelete: (image: string) => void;
 }
 
@@ -388,7 +615,13 @@ const CaptuerCards = ({ capturedImages, onDelete }: CaptuerCardsProps) => {
     return (
         <div className={styles.capture_cards}>
             {capturedImages.map((image, index) => (
-                <CaptureCard key={index} image={image} setSelectedImage={setSelectedImage} onDelete={onDelete} />
+                <CaptureCard
+                    key={index}
+                    type={image.type}
+                    image={image.src}
+                    setSelectedImage={setSelectedImage}
+                    onDelete={onDelete}
+                />
             ))}
 
             {selectedImage && <VideoCapturePopup imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />}
@@ -397,12 +630,25 @@ const CaptuerCards = ({ capturedImages, onDelete }: CaptuerCardsProps) => {
 };
 
 interface CaptureCardProps {
+    type: number /** 1: 비디오 캡쳐, 2: 화질 개선 */;
     image: string;
     setSelectedImage: React.Dispatch<React.SetStateAction<string | null>>;
     onDelete: (index: string) => void;
 }
 
-const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) => {
+// 태그 텍스트 및 스타일 클래스 정의
+const getTagInfo = (type: number) => {
+    switch (type) {
+        case 1:
+            return { text: "비디오 캡쳐", className: styles.tag_video };
+        case 2:
+            return { text: "화질 개선", className: styles.tag_quality };
+        default:
+            return { text: "", className: "" };
+    }
+};
+
+const CaptureCard = ({ type, image, setSelectedImage, onDelete }: CaptureCardProps) => {
     const [progress, setProgress] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const isComplete = progress === 100;
@@ -417,11 +663,9 @@ const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) =>
                 return prev + 1;
             });
         }, 20);
-
         return () => clearInterval(interval);
     }, []);
 
-    /** 이미지 다운로드 함수 */
     const handleDownload = () => {
         const link = document.createElement("a");
         link.href = image;
@@ -429,7 +673,6 @@ const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) =>
         link.click();
     };
 
-    /** 확대된 이미지 보기 함수 */
     const onViewDetail = () => {
         setSelectedImage(image);
     };
@@ -438,6 +681,8 @@ const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) =>
         onDelete(image);
     };
 
+    const { text: tagText, className: tagClass } = getTagInfo(type);
+
     return (
         <div
             className={styles.capture_card}
@@ -445,12 +690,14 @@ const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) =>
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* 이미지 영역 */}
+            {/* 태그 영역 */}
+            {tagText && <div className={`${styles.tag} ${tagClass} ${isComplete ? "" : styles.blink}`}>{tagText}</div>}
+
+            {/* 이미지 프리뷰 */}
             <div
                 className={`${styles.preview} ${isComplete ? styles.visible : styles.dimmed} ${isHovered ? styles.blurred : ""}`}
             >
                 <img src={image} alt="Captured" />
-                {/* 호버 시 버튼 표시 */}
                 {isHovered && (
                     <div className={styles.actions}>
                         <button onClick={onViewDetail}>자세히 보기</button>
@@ -462,7 +709,6 @@ const CaptureCard = ({ image, setSelectedImage, onDelete }: CaptureCardProps) =>
                 )}
             </div>
 
-            {/* 프로그레스 바 */}
             {!isComplete && (
                 <div className={styles.progress_bar}>
                     <div className={styles.progress_fill} style={{ width: `${progress}%` }} />
